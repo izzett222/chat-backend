@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from 'dotenv';
+import db from '../database/models';
 
 config();
 class Access {
@@ -11,9 +12,11 @@ class Access {
           message: 'token not found, please re authenticate',
         });
       }
-      const user = jwt.verify(token, process.env.JWT_SECRET);
+      const decryptedData = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await db.User.findOne({ where: { username: decryptedData.username } });
       req.user = {
         username: user.username,
+        id: user.id,
       };
       return next();
     } catch (error) {
