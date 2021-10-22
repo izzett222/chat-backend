@@ -19,12 +19,12 @@ class Auth {
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
-      await db.User.create({ username, password: hashedPassword });
-      const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '30s' });
+      const savedUser = await db.User.create({ username, password: hashedPassword });
+      const token = jwt.sign({ username, id: savedUser.id.toString() }, process.env.JWT_SECRET, { expiresIn: '30s' });
       return res.status(201).json({
         message: 'user created successful',
         data: {
-          username, token,
+          username, token, id: savedUser.id.toString(),
         },
       });
     } catch (error) {
@@ -53,11 +53,11 @@ class Auth {
           message: 'Wrong email or password',
         });
       }
-      const token = jwt.sign({ username }, process.env.JWT_SECRET);
+      const token = jwt.sign({ username, id: user.id.toString() }, process.env.JWT_SECRET);
       return res.status(201).json({
         message: 'user logged in successful',
         data: {
-          username, token,
+          username, token, id: user.id.toString(),
         },
       });
     } catch (error) {

@@ -5,6 +5,7 @@ import { Op } from 'sequelize';
 import logger from 'morgan';
 import bodyParser from 'body-parser';
 import { Server } from 'socket.io';
+import http from 'http';
 import { config } from 'dotenv';
 import cors from 'cors';
 import routes from './routes';
@@ -18,7 +19,8 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 const port = process.env.PORT || 3006;
-const server = app.listen(port, () => process.stdout.write(`Server is running on http://localhost:${port}/api`));
+const server = http.createServer(app);
+// const server = app.listen(port, () => process.stdout.write(`Server is running on http://localhost:${port}/api`));
 
 const io = new Server(server, {
   cors: {
@@ -37,8 +39,8 @@ io.use(async (socket, next) => {
     return next(new Error('invalid token'));
   }
 });
-
 io.on('connection', async (socket) => {
+  socket.join(socket.userId.toString());
   const users = [];
   const friends = await db.Friend.findAll({
     where: {
@@ -54,10 +56,21 @@ io.on('connection', async (socket) => {
     const otherUser = await db.User.findOne({
       where: { id: socket.userId.toString() === friend.receiver ? friend.sender : friend.receiver },
     });
+    const message = await db.Message.findAll({
+      where: {
+        sender: {
+          [Op.or]: [friend.sender.toString(), friend.receiver.toString()],
+        },
+        receiver: {
+          [Op.or]: [friend.sender.toString(), friend.receiver.toString()],
+        },
+      },
+      order: [['createdAt', 'ASC']],
+    });
     const result = {
       userId: otherUser.id,
       username: otherUser.username,
-      message: [],
+      message,
     };
     users.push(result);
   }, Promise.resolve());
@@ -79,14 +92,23 @@ io.on('connection', async (socket) => {
     requestId: req.id,
     username: requestSenders.find((el) => el.id === Number(req.sender)).username,
   }));
-  socket.join(socket.userID);
   socket.emit('users', users);
   socket.emit('pending_request', request);
+  socket.on('private message', async ({ content, to }) => {
+    const message = {
+      message: content,
+      sender: socket.userId.toString(),
+      receiver: to.toString(),
+    };
+    const savedMessage = await db.Message.create(message);
+    io.sockets.to(to.toString()).to(socket.userId.toString()).emit('private message', savedMessage);
+  });
 });
-
 app.get('/', async (req, res) => res.send('welcome to chat backend'));
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 app.use('/api', routes);
+
+server.listen(port, () => process.stdout.write(`Server is running on http://localhost:${port}/api`));
