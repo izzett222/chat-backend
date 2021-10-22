@@ -4,6 +4,7 @@ class Friend {
   static async add(req, res) {
     try {
       const { user } = req;
+      const { io } = req;
       const sender = await db.User.findOne({ where: { username: user.username } });
       const { friendId } = req.query;
       const friend = await db.User.findOne({ where: { id: friendId } });
@@ -12,11 +13,12 @@ class Friend {
           message: 'friend not found',
         });
       }
-      await db.Friend.create({
+      const newRequest = await db.Friend.create({
         sender: sender.id,
         receiver: friend.id,
         status: 'pending',
       });
+      io.sockets.to(friend.id.toString()).emit('new request', { requestId: newRequest.id, username: user.username });
       return res.status(201).json({ message: 'user added successfully' });
     } catch (error) {
       return res.status(500).json({
@@ -38,7 +40,12 @@ class Friend {
       await friendRequest.update({ status: response });
       if (response === 'approved') {
         const sender = await db.User.findOne({ where: { id: friendRequest.sender } });
-        io.emit('FRIEND_ADDED', {
+        io.sockets.to(friendRequest.sender.toString()).emit('FRIEND_ADDED', {
+          userId: receiver.id,
+          username: receiver.username,
+          message: [],
+        });
+        io.sockets.to(friendRequest.receiver.toString()).emit('FRIEND_ADDED', {
           userId: sender.id,
           username: sender.username,
           message: [],
