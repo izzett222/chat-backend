@@ -20,6 +20,11 @@ class Access {
       };
       return next();
     } catch (error) {
+      if (error.message === 'jwt malformed') {
+        return res.status(401).json({
+          message: 'invalid token, please re authenticate',
+        });
+      }
       if (error.message === 'invalid token') {
         return res.status(401).json({
           message: 'invalid token, please re authenticate',

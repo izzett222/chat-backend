@@ -20,7 +20,7 @@ class Auth {
       }
       const hashedPassword = await bcrypt.hash(password, 10);
       const savedUser = await db.User.create({ username, password: hashedPassword });
-      const token = jwt.sign({ username, id: savedUser.id.toString() }, process.env.JWT_SECRET, { expiresIn: '30s' });
+      const token = jwt.sign({ username, id: savedUser.id.toString() }, process.env.JWT_SECRET);
       return res.status(201).json({
         message: 'user created successful',
         data: {
